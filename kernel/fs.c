@@ -368,29 +368,66 @@ iunlockput(struct inode *ip)
 // Return the disk block address of the nth block in inode ip.
 // If there is no such block, bmap allocates one.
 static uint
-bmap(struct inode *ip, uint bn)
-{
+bmap(struct inode *ip, uint bn){
 	uint addr, *a;
+	uint *indirect;
 	struct buf *bp;
+	struct buf *dbp;
 
-	if(bn < NDIRECT){
-		if((addr = ip->addrs[bn]) == 0)
+	// Direct Pointer
+	if (bn < NDIRECT){
+		// get direct pointer, allocate if necessary
+		if ((addr = ip->addrs[bn]) == 0){
 			ip->addrs[bn] = addr = balloc(ip->dev);
+		}
 		return addr;
 	}
+
 	bn -= NDIRECT;
 
-	if(bn < NINDIRECT){
-		// Load indirect block, allocating if necessary.
-		if((addr = ip->addrs[NDIRECT]) == 0)
+	// Indirect Pointer
+	if (bn < NINDIRECT){
+		// load indirect block, allocate if necessary
+		if ((addr = ip->addrs[NDIRECT]) == 0){
 			ip->addrs[NDIRECT] = addr = balloc(ip->dev);
+		}
 		bp = bread(ip->dev, addr);
-		a = (uint*)bp->data;
-		if((addr = a[bn]) == 0){
+		a = (uint *)bp->data;
+		// get direct pointer, allocate if necessary
+		if ((addr = a[bn]) == 0){
 			a[bn] = addr = balloc(ip->dev);
 			log_write(bp);
 		}
+		// release indirect block
 		brelse(bp);
+		// return disk block address
+		return addr;
+	}
+
+	bn -= NINDIRECT;
+
+	if (bn < NDINDIRECT){
+		// load double-indirect block, allocate if necessary
+		if ((addr = ip->addrs[NDIRECT + 1]) == 0){
+			ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
+		}
+		dbp = bread(ip->dev, addr);
+		indirect = (uint *)dbp->data;
+		// load indirect block, allocate if necessary
+		if ((addr = indirect[bn / NINDIRECT]) == 0){
+			indirect[bn / NINDIRECT] = addr = balloc(ip->dev);
+		}
+		bp = bread(ip->dev, addr);
+		a = (uint *)bp->data;
+		// get direct pointer, allocate if necessary
+		if ((addr = a[bn % NINDIRECT]) == 0){
+			a[bn % NINDIRECT] = addr = balloc(ip->dev);
+			log_write(bp);
+		}
+		// release indirect & double-indirect blocks
+		brelse(bp);
+		brelse(dbp);
+		// return disk block address
 		return addr;
 	}
 
@@ -405,32 +442,69 @@ bmap(struct inode *ip, uint bn)
 static void
 itrunc(struct inode *ip)
 {
-	int i, j;
+	int i, j, k;
 	struct buf *bp;
+	struct buf *dbp;
 	uint *a;
+	uint *d;
 
-	for(i = 0; i < NDIRECT; i++){
-		if(ip->addrs[i]){
+	// free the direct pointers
+	for (i = 0; i < NDIRECT; i++){
+		if (ip->addrs[i]){
 			bfree(ip->dev, ip->addrs[i]);
 			ip->addrs[i] = 0;
 		}
 	}
 
-	if(ip->addrs[NDIRECT]){
+	// free the indirect pointer
+	if (ip->addrs[NDIRECT]){
+		// load the indirect block
 		bp = bread(ip->dev, ip->addrs[NDIRECT]);
-		a = (uint*)bp->data;
-		for(j = 0; j < NINDIRECT; j++){
-			if(a[j])
+		a = (uint *)bp->data;
+		// iterate over the block, and free all direct pointers
+		for (j = 0; j < NINDIRECT; j++){
+			if (a[j])
 				bfree(ip->dev, a[j]);
 		}
+		// free the indirect pointer
 		brelse(bp);
 		bfree(ip->dev, ip->addrs[NDIRECT]);
 		ip->addrs[NDIRECT] = 0;
 	}
 
+	// free the double indirect pointer
+	if (ip->addrs[NDIRECT + 1]){
+		// load the double-indirect block
+		dbp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
+		d = (uint *)dbp->data;
+		// iterate over the block, and free all indirect blocks
+		for (k = 0; k < NINDIRECT; k++){
+			if (d[k]) { // check if d[k] is non-zero before calling bread and bfree
+				// load the indirect block
+				bp = bread(ip->dev, d[k]);
+				a = (uint *)bp->data;
+				// iterate over the block, and free all direct pointers
+				for (j = 0; j < NINDIRECT; j++)
+				{
+					if (a[j])
+						bfree(ip->dev, a[j]);
+				}
+				// free the infirect pointer
+				brelse(bp);
+				bfree(ip->dev, d[k]);
+				d[k] = 0;
+			}
+		}
+		// free the double-indirect pointer
+		brelse(dbp);
+		bfree(ip->dev, ip->addrs[NDIRECT + 1]);
+		ip->addrs[NDIRECT + 1] = 0;
+	}
+
 	ip->size = 0;
 	iupdate(ip);
 }
+
 
 // Copy stat information from inode.
 // Caller must hold ip->lock.
