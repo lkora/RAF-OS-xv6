@@ -14,6 +14,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "x86.h"
+#include "kbd.h"
 
 static void consputc(int);
 
@@ -126,6 +127,130 @@ panic(char *s)
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
 
+// Allocate a new buffer of the same size as the original buffer
+
+
+/*
+A color mask is created
+- Single space in memory is 2 bytes = 16 Bits
+		Higher byte is used for setting the foreground and background color
+		Lower byte is an ASCII character
+The color is represented as as 4 bits
+	First 4 bits represent foreground color
+    Last 4 bits represent background color
+The mask ((x << 4) | y) << 8
+x, y are background and foreground values respectively
+1. X's value is taken and shifted by 4 spaces to the left this will represent our background color
+   	Shifting to the left populates the last 4 spaces with logical 0 values
+2. By doing bitwise | (or) with Y's value we populate the last 4 bits in memory which coorespond to our
+   	foreground color
+3. Lastly the created byte which represents the color is shifted by 8 to make space for a single byte
+   	to be populated with the respective ASCII character representation
+*/
+static int color = ((0 << 4) | 15) << 8;
+/*
+Color table: 
+0 - black			8 - bright gray
+1 - dark blue		9 - bright blue
+2 - dark green		10 - bright green
+3 - dark cyan		11 - bright cyan
+4 - dark red		12 - bright red
+5 - dark purple		13 - bright purple
+6 - dark yellow		14 - bright yellow
+7 - dark gray		15 - white
+*/
+
+int selected_row = 0;
+const char *selectable_color_names[] = {"WHT BLK", "PUR WHT", "RED AQU", "WHT YEL"};
+const int selectable_colors[] = {
+					((0 << 4) | 15) << 8, 
+					((15 << 4) | 13) << 8,
+					((3 << 4) | 12) << 8,
+					((6 << 4) | 15) << 8
+};
+
+int is_showing_table = 0;
+void show_table() {
+	const int console_width = 80;
+	const int console_height = 25;
+	const int base_color = ((7 << 4) | 0) << 8;
+	const int selected_color = ((2 << 4) | 0) << 8;
+
+
+	int rows = 4;
+	int cols = 9;
+	int pos;
+
+	// Cursor position: col + 80*row.
+	outb(CRTPORT, 14);
+	pos = inb(CRTPORT+1) << 8;
+	outb(CRTPORT, 15);
+	pos |= inb(CRTPORT+1);
+
+	int i, j;
+	int height = rows * 2 + 1;
+	
+
+	// Get the starting position
+	pos = pos - height * console_width;
+	// Adjust the starting position to the left if the table width exceeds console width
+	int pos_in_row = pos % console_width;
+	if(pos_in_row + cols > console_width) {
+		// Bind the table to the right edge
+		// pos -= (pos_in_row + cols) % console_width;
+		pos -= cols;
+	}
+
+
+	for(i = 0; i < height; i++) {
+		for(j = 0; j < cols; j++) {
+			// Corners
+			if((i == 0 || i == height - 1) && (j == 0 || j == cols - 1)){
+				crt[pos+j] = '+' | base_color;
+			} 
+			// Vertical sides
+			else if (j == 0 || j == cols - 1) {
+				crt[pos+j] = '|' | base_color;
+			}
+			// Horizontal sides
+			else if (i == 0 || i == height - 1 || i % 2 == 0) {
+				crt[pos+j] = '-' | base_color;
+			}
+			// Content
+			else {
+				crt[pos+j] = selectable_color_names[i/2][j-1] | (i == selected_row ? base_color : (i/2 == selected_row ? selected_color : base_color));
+			}
+			
+		}
+		// Go to next row starting from the same column
+		pos += 80;
+	}
+
+}
+
+ushort *crt_copy;
+void copy_crt() {
+    // Allocate memory for the copy
+    crt_copy = (ushort*)kalloc();
+    if (!crt_copy) {
+        cprintf("Error: Failed to allocate memory for CRT copy\n");
+        return;
+    }
+
+    // Copy the CRT memory to the new location
+    memcpy(crt_copy, crt, 2 * 80 * 25);
+}
+
+void restore_crt() {
+    // Copy the contents of the copy back to CRT memory
+    memcpy(crt, crt_copy, 2 * 80 * 25);
+
+    // Free the memory used by the copy
+    kfree((char*)crt_copy);
+    crt_copy = 0;
+}
+
+
 static void
 cgaputc(int c)
 {
@@ -142,7 +267,7 @@ cgaputc(int c)
 	else if(c == BACKSPACE){
 		if(pos > 0) --pos;
 	} else
-		crt[pos++] = (c&0xff) | 0x0700;  // black on white
+		crt[pos++] = (c&0xff) | color;  // Or it with the custom color mask
 
 	if(pos < 0 || pos > 25*80)
 		panic("pos under/overflow");
@@ -184,8 +309,6 @@ struct {
 	uint e;  // Edit index
 } input;
 
-#define C(x)  ((x)-'@')  // Control-x
-
 void
 consoleintr(int (*getc)(void))
 {
@@ -211,8 +334,31 @@ consoleintr(int (*getc)(void))
 				consputc(BACKSPACE);
 			}
 			break;
+		case A('C'): 
+			is_showing_table = !is_showing_table;
+			if (is_showing_table) {
+				// Save previous buffer and show selection
+				copy_crt();
+				show_table();
+			} else {
+				// Restore buffer
+				restore_crt();
+				color = selectable_colors[selected_row];
+			}
+
+			break;
 		default:
-			if(c != 0 && input.e-input.r < INPUT_BUF){
+			// Move up/down and redraw table
+			if(is_showing_table) {
+				if (c == 'w') {
+					selected_row -= 1;
+					selected_row = selected_row < 0 ? 0 : selected_row;
+				} else if (c == 's') {
+					selected_row += 1;
+					selected_row = selected_row >= 4 ? selected_row - 1 : selected_row;
+				}
+				show_table();
+			} else if(c != 0 && input.e-input.r < INPUT_BUF){
 				c = (c == '\r') ? '\n' : c;
 				input.buf[input.e++ % INPUT_BUF] = c;
 				consputc(c);
@@ -221,6 +367,7 @@ consoleintr(int (*getc)(void))
 					wakeup(&input.r);
 				}
 			}
+			
 			break;
 		}
 	}
