@@ -16,6 +16,8 @@
 #include "file.h"
 #include "fcntl.h"
 
+extern int encr_key;
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -439,5 +441,76 @@ sys_pipe(void)
 	}
 	fd[0] = fd0;
 	fd[1] = fd1;
+	return 0;
+}
+
+int
+sys_decr(void)
+{
+	int fd;
+	struct file *f;
+	int n;
+	char buf[512];
+	int i;
+
+	if(argfd(0, &fd, &f) < 0)
+		return -1;
+	if(encr_key == -1)
+		return -1;
+	if(f->type == T_DEV)
+		return -2;
+
+	begin_op();
+	ilock(f->ip);
+	while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
+		for(i = 0; i < n; i++){
+			if(buf[i] >= 'A' && buf[i] <= 'Z'){
+				buf[i] = ((buf[i] - 'A' - encr_key + 26) % 26) + 'A';
+			} else if(buf[i] >= 'a' && buf[i] <= 'z'){
+				buf[i] = ((buf[i] - 'a' - encr_key + 26) % 26) + 'a';
+			}
+		}
+		writei(f->ip, buf, f->off, n);
+		f->off += n;
+	}
+	iunlockput(f->ip);
+	end_op();
+
+	return 0;
+}
+
+
+int
+sys_encr(void)
+{
+	int fd;
+	struct file *f;
+	int n;
+	char buf[512];
+	int i;
+
+	if(argfd(0, &fd, &f) < 0)
+		return -1;
+	if(encr_key == -1)
+		return -1;
+	if(f->type == T_DEV)
+		return -2;
+
+	begin_op();
+	ilock(f->ip);
+	while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
+		for(i = 0; i < n; i++){
+			if(buf[i] >= 'A' && buf[i] <= 'Z'){
+				buf[i] = ((buf[i] - 'A' + encr_key) % 26) + 'A';
+			} else if(buf[i] >= 'a' && buf[i] <= 'z'){
+				buf[i] = ((buf[i] - 'a' + encr_key) % 26) + 'a';
+			}
+		}
+		writei(f->ip, buf, f->off, n);
+		f->off += n;
+	}
+	iunlockput(f->ip);
+	end_op();
+
 	return 0;
 }
