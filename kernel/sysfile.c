@@ -464,11 +464,7 @@ sys_decr(void)
 	ilock(f->ip);
 	while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
 		for(i = 0; i < n; i++){
-			if(buf[i] >= 'A' && buf[i] <= 'Z'){
-				buf[i] = ((buf[i] - 'A' - encr_key + 26) % 26) + 'A';
-			} else if(buf[i] >= 'a' && buf[i] <= 'z'){
-				buf[i] = ((buf[i] - 'a' - encr_key + 26) % 26) + 'a';
-			}
+      		buf[i] = (buf[i] - encr_key + 128) % 128;
 		}
 		writei(f->ip, buf, f->off, n);
 		f->off += n;
@@ -500,11 +496,7 @@ sys_encr(void)
 	ilock(f->ip);
 	while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
 		for(i = 0; i < n; i++){
-			if(buf[i] >= 'A' && buf[i] <= 'Z'){
-				buf[i] = ((buf[i] - 'A' + encr_key) % 26) + 'A';
-			} else if(buf[i] >= 'a' && buf[i] <= 'z'){
-				buf[i] = ((buf[i] - 'a' + encr_key) % 26) + 'a';
-			}
+			buf[i] = (buf[i] + encr_key) % 128;
 		}
 		writei(f->ip, buf, f->off, n);
 		f->off += n;
