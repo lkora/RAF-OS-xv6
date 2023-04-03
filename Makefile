@@ -212,6 +212,7 @@ UPROGS=\
 	$U/_big\
 	$U/_blockwriter\
 	$U/_setecho\
+	$U/_setkey\
 
 fs.img: $T/mkfs README $(UPROGS)
 	$T/mkfs fs.img README $(UPROGS)

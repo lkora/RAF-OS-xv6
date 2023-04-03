@@ -18,10 +18,7 @@
 
 // Echo function toggle
 int cons_echo = 1;
-void
-cons_setecho(int do_echo) {
-	cons_echo = do_echo;
-}
+int encr_key = 0;
 
 
 static void consputc(int);
@@ -368,9 +365,15 @@ consoleintr(int (*getc)(void))
 				show_table();
 			} else if(c != 0 && input.e-input.r < INPUT_BUF){
 				c = (c == '\r') ? '\n' : c;
-				c = (cons_echo == 0 && c != '\n') ? '*' : c;
 				input.buf[input.e++ % INPUT_BUF] = c;
-				consputc(c);
+				
+				// Hide characters that are to be hidden
+				if (cons_echo == 0 && c != '\n'){
+					consputc('*');
+				} else {
+					consputc(c);
+				}				
+				
 				if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
 					input.w = input.e;
 					wakeup(&input.r);
