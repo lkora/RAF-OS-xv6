@@ -41,8 +41,11 @@ int main(int argc, char *argv[])
 
     if (newkey == -1) {
         printf("Enter new key: ");
+        // Hide console characters, read buffer, unhide characters 
+        setecho(0);
         gets(buf, sizeof(buf));
         newkey = atoi(buf);
+        setecho(1);
     }
 
     if (setkey(newkey) < 0) {
