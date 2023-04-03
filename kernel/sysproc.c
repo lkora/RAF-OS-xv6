@@ -89,3 +89,17 @@ sys_uptime(void)
 	release(&tickslock);
 	return xticks;
 }
+
+int
+sys_setecho(void)
+{
+  int do_echo;
+
+  if(argint(0, &do_echo) < 0)
+    return -1;
+
+  // set the global echo flag in the console driver
+  cons_setecho(do_echo);
+
+  return 0;
+}
