@@ -416,6 +416,7 @@ bmap(struct inode *ip, uint bn){
 		// load indirect block, allocate if necessary
 		if ((addr = indirect[bn / NINDIRECT]) == 0){
 			indirect[bn / NINDIRECT] = addr = balloc(ip->dev);
+			log_write(dbp);
 		}
 		bp = bread(ip->dev, addr);
 		a = (uint *)bp->data;
@@ -423,6 +424,7 @@ bmap(struct inode *ip, uint bn){
 		if ((addr = a[bn % NINDIRECT]) == 0){
 			a[bn % NINDIRECT] = addr = balloc(ip->dev);
 			log_write(bp);
+			log_write(dbp);
 		}
 		// release indirect & double-indirect blocks
 		brelse(bp);
