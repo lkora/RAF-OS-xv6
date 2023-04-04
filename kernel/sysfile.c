@@ -444,65 +444,89 @@ sys_pipe(void)
 	return 0;
 }
 
-int
-sys_decr(void)
+int sys_decr(void)
 {
-	int fd;
-	struct file *f;
-	int n;
-	char buf[512];
-	int i;
+    int fd;
+    struct file *f;
+    int n;
+    char buf[512];
+    int i;
+    int block_count = 0;
+    int blocks_per_transaction = 10; // commit the transaction after processing this many blocks
 
-	if(argfd(0, &fd, &f) < 0)
-		return -1;
-	if(encr_key == -1)
-		return -1;
-	if(f->type == T_DEV)
-		return -2;
+    if(argfd(0, &fd, &f) < 0)
+        return -1;
+    if(encr_key == -1)
+        return -1;
+    if(f->type == T_DEV)
+        return -2;
 
-	begin_op();
-	ilock(f->ip);
-	while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
-		for(i = 0; i < n; i++){
-      		buf[i] = (buf[i] - encr_key + 128) % 128;
-		}
-		writei(f->ip, buf, f->off, n);
-		f->off += n;
-	}
-	iunlockput(f->ip);
-	end_op();
+    begin_op();
+    ilock(f->ip);
+    while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
+        for(i = 0; i < n; i++){
+            buf[i] = (buf[i] - encr_key + 128) % 128;
+        }
+        writei(f->ip, buf, f->off, n);
+        f->off += n;
 
-	return 0;
+        block_count++;
+        if (block_count >= blocks_per_transaction) {
+            // commit the transaction and start a new one
+            iunlock(f->ip); // unlock the inode without decrementing its reference count
+            end_op();
+            begin_op();
+            ilock(f->ip); // lock the inode again
+
+            block_count = 0;
+        }
+    }
+    iunlockput(f->ip); // unlock the inode and decrement its reference count
+    end_op();
+
+    return 0;
 }
 
 
-int
-sys_encr(void)
+int sys_encr(void)
 {
-	int fd;
-	struct file *f;
-	int n;
-	char buf[512];
-	int i;
+    int fd;
+    struct file *f;
+    int n;
+    char buf[512];
+    int i;
+    int block_count = 0;
+    int blocks_per_transaction = 10; // commit the transaction after processing this many blocks
 
-	if(argfd(0, &fd, &f) < 0)
-		return -1;
-	if(encr_key == -1)
-		return -1;
-	if(f->type == T_DEV)
-		return -2;
+    if(argfd(0, &fd, &f) < 0)
+        return -1;
+    if(encr_key == -1)
+        return -1;
+    if(f->type == T_DEV)
+        return -2;
 
-	begin_op();
-	ilock(f->ip);
-	while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
-		for(i = 0; i < n; i++){
-			buf[i] = (buf[i] + encr_key) % 128;
-		}
-		writei(f->ip, buf, f->off, n);
-		f->off += n;
-	}
-	iunlockput(f->ip);
-	end_op();
+    begin_op();
+    ilock(f->ip);
+    while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
+        for(i = 0; i < n; i++){
+            buf[i] = (buf[i] + encr_key) % 128;
+        }
+        writei(f->ip, buf, f->off, n);
+        f->off += n;
 
-	return 0;
+        block_count++;
+        if (block_count >= blocks_per_transaction) {
+            // commit the transaction and start a new one
+            iunlock(f->ip); // unlock the inode without decrementing its reference count
+            end_op();
+            begin_op();
+            ilock(f->ip); // lock the inode again
+
+            block_count = 0;
+        }
+    }
+    iunlockput(f->ip); // unlock the inode and decrement its reference count
+    end_op();
+
+    return 0;
 }
