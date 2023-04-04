@@ -15,6 +15,8 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "decr.h"
+#include "encr.h"
 
 extern int encr_key;
 
@@ -72,10 +74,11 @@ int
 sys_read(void)
 {
 	struct file *f;
+	struct stat st;
 	int n;
 	char *p;
 
-	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0 || filestat(f, &st) < 0)
 		return -1;
 	return fileread(f, p, n);
 }
@@ -84,10 +87,11 @@ int
 sys_write(void)
 {
 	struct file *f;
+	struct stat st;
 	int n;
 	char *p;
 
-	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0 || filestat(f, &st) < 0)
 		return -1;
 	return filewrite(f, p, n);
 }
@@ -454,12 +458,15 @@ int sys_decr(void)
     int block_count = 0;
     int blocks_per_transaction = 10; // commit the transaction after processing this many blocks
 
-    if(argfd(0, &fd, &f) < 0)
-        return -1;
-    if(encr_key == -1)
+    if(argfd(0, &fd, &f) < 0 || encr_key == -1)
         return -1;
     if(f->type == T_DEV)
         return -2;
+
+    // check if the file is encrypted
+    if ((f->ip)->major == 0) {
+        return -3;
+    }
 
     begin_op();
     ilock(f->ip);
@@ -481,11 +488,17 @@ int sys_decr(void)
             block_count = 0;
         }
     }
+
+    // update the encryption status of the file
+    (f->ip)->major = 0;
+    iupdate(f->ip); // write the updated inode to disk
+
     iunlockput(f->ip); // unlock the inode and decrement its reference count
     end_op();
 
     return 0;
 }
+
 
 
 int sys_encr(void)
@@ -498,12 +511,15 @@ int sys_encr(void)
     int block_count = 0;
     int blocks_per_transaction = 10; // commit the transaction after processing this many blocks
 
-    if(argfd(0, &fd, &f) < 0)
-        return -1;
-    if(encr_key == -1)
+    if(argfd(0, &fd, &f) < 0 || encr_key == -1)
         return -1;
     if(f->type == T_DEV)
         return -2;
+
+    // check if the file is already encrypted
+    if ((f->ip)->major == 1) {
+        return -3;
+    }
 
     begin_op();
     ilock(f->ip);
@@ -525,6 +541,11 @@ int sys_encr(void)
             block_count = 0;
         }
     }
+
+    // update the encryption status of the file
+    (f->ip)->major = 1;
+    iupdate(f->ip); // write the updated inode to disk
+
     iunlockput(f->ip); // unlock the inode and decrement its reference count
     end_op();
 

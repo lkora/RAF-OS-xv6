@@ -18,7 +18,7 @@
 
 // Echo function toggle
 int cons_echo = 1;
-int encr_key = 0;
+int encr_key = -1;
 
 
 static void consputc(int);

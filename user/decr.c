@@ -3,11 +3,12 @@
 #include "user.h"
 #include "kernel/fcntl.h"
 #include "kernel/fs.h"
+#include "kernel/decr.h"
 
 char buf[512];
 
 void decr_usage(void) {
-    printf("Usage: decr [OPTIONS] [FILE]...\n"
+    fprintf(1, "Usage: decr [OPTIONS] [FILE]...\n"
             "Decrypt one or more files using Caesar cipher.\n"
             "Options:\n"
             "  -h, --help: Show this help message and exit\n"
@@ -18,12 +19,13 @@ void decrypt_file(char *path) {
     int fd;
 
     if ((fd = open(path, O_RDWR)) < 0) {
-        printf("decr: cannot open %s\n", path);
+        fprintf(2, "decr: cannot open %s\n", path);
         return;
     }
 
-    if (decr(fd) < 0) {
-        printf("decr: failed to decrypt %s\n", path);
+    int decr_status = decr(fd);
+    if (decr_status < 0) {
+        fprintf(2, "encr: failed to decrypt %s with code: %d\n", path, decr_status);
         close(fd);
         return;
     }
@@ -38,7 +40,7 @@ void decrypt_all(void)
     struct stat st;
 
     if ((fd = open(".", O_RDONLY)) < 0) {
-        printf("decr: cannot open .\n");
+        fprintf(2, "decr: cannot open .\n");
         return;
     }
 
@@ -46,7 +48,7 @@ void decrypt_all(void)
         if (de.inum == 0 || de.name[0] == '.')
             continue;
         if (stat(de.name, &st) < 0) {
-            printf("decr: cannot stat %s\n", de.name);
+            fprintf(2, "decr: cannot stat %s\n", de.name);
             continue;
         }
         if (st.type != T_FILE)
@@ -71,7 +73,7 @@ int main(int argc, char *argv[])
             decrypt_all_flag = 1;
         }
         else if (argv[i][0] == '-') {
-            printf("decr: unknown option %s\n", argv[i]);
+            fprintf(1, "decr: unknown option %s\n", argv[i]);
             decr_usage();
             exit();
         }

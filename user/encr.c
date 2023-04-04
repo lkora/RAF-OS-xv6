@@ -3,11 +3,12 @@
 #include "user.h"
 #include "kernel/fcntl.h"
 #include "kernel/fs.h"
+#include "kernel/encr.h"
 
 char buf[512];
 
 void encr_usage(void) {
-    printf("Usage: encr [OPTIONS] [FILE]...\n"
+    fprintf(1, "Usage: encr [OPTIONS] [FILE]...\n"
             "Encrypt one or more files using Caesar cipher.\n"
             "Options:\n"
             "  -h, --help: Show this help message and exit\n"
@@ -18,12 +19,13 @@ void encrypt_file(char *path) {
     int fd;
 
     if ((fd = open(path, O_RDWR)) < 0) {
-        printf("encr: cannot open %s\n", path);
+        fprintf(2, "encr: cannot open %s\n", path);
         return;
     }
 
-    if (encr(fd) < 0) {
-        printf("encr: failed to encrypt %s\n", path);
+    int encr_status = encr(fd);
+    if (encr_status < 0) {
+        fprintf(2, "encr: failed to encrypt %s with code: %d\n", path, encr_status);
         close(fd);
         return;
     }
@@ -37,7 +39,7 @@ void encrypt_all(void) {
     struct stat st;
 
     if ((fd = open(".", O_RDONLY)) < 0) {
-        printf("encr: cannot open .\n");
+        fprintf(2, "encr: cannot open .\n");
         return;
     }
 
@@ -45,7 +47,7 @@ void encrypt_all(void) {
         if (de.inum == 0 || de.name[0] == '.')
             continue;
         if (stat(de.name, &st) < 0) {
-            printf("encr: cannot stat %s\n", de.name);
+            fprintf(2, "encr: cannot stat %s\n", de.name);
             continue;
         }
         if (st.type != T_FILE)
@@ -69,7 +71,7 @@ int main(int argc, char *argv[]) {
             encrypt_all_flag = 1;
         }
         else if (argv[i][0] == '-') {
-            printf("encr: unknown option %s\n", argv[i]);
+            fprintf(1, "encr: unknown option %s\n", argv[i]);
             encr_usage();
             exit();
         }

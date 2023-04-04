@@ -25,6 +25,8 @@ HDRS = \
 	$K/traps.h\
 	$K/types.h\
 	$K/x86.h\
+	$K/encr.h\
+	$K/decr.h\
 	$U/user.h\
 
 OBJS = \
