@@ -25,6 +25,8 @@ HDRS = \
 	$K/traps.h\
 	$K/types.h\
 	$K/x86.h\
+	$K/encr.h\
+	$K/decr.h\
 	$U/user.h\
 
 OBJS = \
@@ -209,6 +211,12 @@ UPROGS=\
 	$U/_usertests\
 	$U/_wc\
 	$U/_zombie\
+	$U/_big\
+	$U/_blockwriter\
+	$U/_setecho\
+	$U/_setkey\
+	$U/_decr\
+	$U/_encr\
 
 fs.img: $T/mkfs README $(UPROGS)
 	$T/mkfs fs.img README $(UPROGS)

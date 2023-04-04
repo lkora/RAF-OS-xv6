@@ -15,6 +15,10 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "decr.h"
+#include "encr.h"
+
+extern int encr_key;
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -70,24 +74,37 @@ int
 sys_read(void)
 {
 	struct file *f;
-	int n;
+	struct stat st;
+	int n, i;
 	char *p;
 
-	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0 || filestat(f, &st) < 0)
 		return -1;
-	return fileread(f, p, n);
+	n = fileread(f, p, n);
+
+	if((f->ip)->major == 1 && st.type == T_FILE && encr_key >= 0)
+		for (i = 0; i < n; i++) 
+            p[i] = (p[i] - encr_key + 128) % 128;
+        
+	return n;
 }
 
 int
 sys_write(void)
 {
 	struct file *f;
-	int n;
+	struct stat st;
+	int n, i;
 	char *p;
 
-	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
+	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0 || filestat(f, &st) < 0)
 		return -1;
-	return filewrite(f, p, n);
+	n = filewrite(f, p, n);
+	if((f->ip)->major == 0 && st.type == T_FILE && encr_key >= 0)
+		for (i = 0; i < n; i++) 
+            p[i] = (p[i] + encr_key) % 128;
+        
+	return n;
 }
 
 int
@@ -440,4 +457,108 @@ sys_pipe(void)
 	fd[0] = fd0;
 	fd[1] = fd1;
 	return 0;
+}
+
+int sys_decr(void)
+{
+    int fd;
+    struct file *f;
+    int n;
+    char buf[512];
+    int i;
+    int block_count = 0;
+    int blocks_per_transaction = 10; // commit the transaction after processing this many blocks
+
+    if(argfd(0, &fd, &f) < 0 || encr_key == -1)
+        return -1;
+    if(f->type == T_DEV)
+        return -2;
+
+    // check if the file is encrypted
+    if ((f->ip)->major == 0) {
+        return -3;
+    }
+
+    begin_op();
+    ilock(f->ip);
+    while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
+        for(i = 0; i < n; i++){
+            buf[i] = (buf[i] - encr_key + 128) % 128;
+        }
+        writei(f->ip, buf, f->off, n);
+        f->off += n;
+
+        block_count++;
+        if (block_count >= blocks_per_transaction) {
+            // commit the transaction and start a new one
+            iunlock(f->ip); // unlock the inode without decrementing its reference count
+            end_op();
+            begin_op();
+            ilock(f->ip); // lock the inode again
+
+            block_count = 0;
+        }
+    }
+
+    // update the encryption status of the file
+    (f->ip)->major = 0;
+    iupdate(f->ip); // write the updated inode to disk
+
+    iunlockput(f->ip); // unlock the inode and decrement its reference count
+    end_op();
+
+    return 0;
+}
+
+
+
+int sys_encr(void)
+{
+    int fd;
+    struct file *f;
+    int n;
+    char buf[512];
+    int i;
+    int block_count = 0;
+    int blocks_per_transaction = 10; // commit the transaction after processing this many blocks
+
+    if(argfd(0, &fd, &f) < 0 || encr_key == -1)
+        return -1;
+    if(f->type == T_DEV)
+        return -2;
+
+    // check if the file is already encrypted
+    if ((f->ip)->major == 1) {
+        return -3;
+    }
+
+    begin_op();
+    ilock(f->ip);
+    while((n = readi(f->ip, buf, f->off, sizeof(buf))) > 0){
+        for(i = 0; i < n; i++){
+            buf[i] = (buf[i] + encr_key) % 128;
+        }
+        writei(f->ip, buf, f->off, n);
+        f->off += n;
+
+        block_count++;
+        if (block_count >= blocks_per_transaction) {
+            // commit the transaction and start a new one
+            iunlock(f->ip); // unlock the inode without decrementing its reference count
+            end_op();
+            begin_op();
+            ilock(f->ip); // lock the inode again
+
+            block_count = 0;
+        }
+    }
+
+    // update the encryption status of the file
+    (f->ip)->major = 1;
+    iupdate(f->ip); // write the updated inode to disk
+
+    iunlockput(f->ip); // unlock the inode and decrement its reference count
+    end_op();
+
+    return 0;
 }
