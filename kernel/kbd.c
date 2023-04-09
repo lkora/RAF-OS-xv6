@@ -11,7 +11,7 @@ kbdgetc(void)
 	// 000   001   010   011   100   101   110   111
 	//  N     S     C     CS   A     A S   A C   ACS
 	static uchar *charcode[8] = {
-		normalmap, shiftmap, ctlmap, ctlmap, altmap, altmap, altmap, altmap
+		normalmap, shiftmap, ctlmap, ctlmap, altmap, shiftmap, ctlmap, ctlmap
 	};
 
 	uint st, data, c;
