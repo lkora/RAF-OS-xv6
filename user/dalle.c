@@ -2,43 +2,34 @@
 #include "kernel/stat.h"
 #include "kernel/fcntl.h"
 #include "user.h"
-
-#define MAX_WORD_SIZE 100
-
-struct shared_data {
-    char *filepath;
-    int sentence_count;
-    char longest_word[MAX_WORD_SIZE];
-    int longest_word_size;
-    char shortest_word[MAX_WORD_SIZE];
-    int shortest_word_size;
-    char text_longest_word[MAX_WORD_SIZE];
-    int text_longest_word_size;
-    int command;
-    char text_shortest_word[MAX_WORD_SIZE];
-    int text_shortest_word_size;
-};
+#include "shared_data.h"
 
 int main(int argc, char *argv[]) {
     // Initialize the shared data
-    struct shared_data data = {0};
-    if (argc > 1) {
-        data.filepath = argv[1];
-    } else {
-        data.filepath = "../home/README";
-    }
-    data.sentence_count = 0;
-    data.longest_word_size = 0;
-    data.shortest_word_size = MAX_WORD_SIZE;
-    data.text_longest_word_size = 0;
-    data.command = 0;
-    data.text_shortest_word_size = MAX_WORD_SIZE;
+    
+    char* filepath = argc > 1 ? argv[1] : "/home/README\0";
+    
+    struct shared_data data = {
+        .filepath = filepath,
+        .sentence_count = 0,
+        .longest_word_size = 0,
+        .shortest_word_size = MAX_WORD_SIZE,
+        .text_longest_word_size = 0,
+        .command = 0,
+        .text_shortest_word_size = MAX_WORD_SIZE,
+    };
 
+    fprintf(2, "data struct size: %d\n", sizeof(data));
     // Share the data with child processes
-    if (share_data("data", &data, sizeof(data)) < 0) {
+    if (share_data("data", (void*)&data, sizeof(data)) < 0) {
         fprintf(2, "share_data failed\n");
         exit();
     }
+
+    fprintf(2, "DALLE - Addr shared: %p\n", data);
+    fprintf(2, "%s %d %d %d %d\n", data.filepath, data.sentence_count, data.longest_word_size, data.shortest_word_size, data.text_shortest_word_size);
+    printf("Parent: filepath = %s, data.filepath = %p\n", data.filepath, data.filepath);
+
 
     // Start the coMMa child process
     int pid1 = fork();

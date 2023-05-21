@@ -384,12 +384,18 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 	return 0;
 }
 
-int smappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
-{
-	return mappages(pgdir,va,size,pa,perm);
+int smappages(pde_t *pgdir, void *va, uint size, uint pa, int perm) {
+
+    // Round down the virtual address to the nearest page boundary
+    char *va_aligned = (char *)PGROUNDDOWN((uint)va);
+
+    // Round up the size to the nearest multiple of PGSIZE
+    uint size_aligned = PGROUNDUP(size);
+
+    return mappages(pgdir, va_aligned, size_aligned, pa, perm);
 }
-pte_t * swalkpgdir(pde_t *pgdir, const void *va, int alloc)
-{
-return walkpgdir(pgdir,va,alloc);
+
+pte_t * swalkpgdir(pde_t *pgdir, const void *va, int alloc) {
+	return walkpgdir(pgdir,va,alloc);
 }
 

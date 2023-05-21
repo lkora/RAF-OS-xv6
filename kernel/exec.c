@@ -92,17 +92,41 @@ exec(char *path, char **argv)
 		if(*s == '/')
 			last = s+1;
 	safestrcpy(curproc->name, last, sizeof(curproc->name));
-	
+
 	// Map the shared objects
-    pde_t *parent_pgdir = curproc->pgdir;
-    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
-        if (curproc->shared_structs[i].size > 0) {
-            char *mem = kalloc();
-            memmove(mem, curproc->shared_structs[i].addr, PGSIZE);
-            smappages(parent_pgdir, (char *)(1 << 30) + i * PGSIZE, PGSIZE, V2P(mem), PTE_W | PTE_U);
-            curproc->shared_structs[i].addr = (void *)((1 << 30) + i * PGSIZE);
-        }
-    }
+    // pde_t *parent_pgdir = curproc->pgdir;
+    // for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+    //     if (curproc->shared_structs[i].size > 0) {
+    //         char *mem = kalloc();
+    //         memmove(mem, curproc->shared_structs[i].addr, PGSIZE);
+    //         smappages(parent_pgdir, (char *)(1 << 30) + i * PGSIZE, PGSIZE, V2P(mem), PTE_W | PTE_U);
+    //         curproc->shared_structs[i].addr = (void *)((1 << 30) + i * PGSIZE);
+    //     }
+    // }
+	for(i = 0; i < MAX_SHARED_STRUCTS; i++){
+		int size;
+		if((size=curproc->shared_structs[i].size) != 0){
+			pte_t* pte;
+			// Only valid shared memory regions are to be mapped
+ 			if((pte = swalkpgdir(curproc->parent_pgdir, curproc->shared_structs[i].addr, 0)) == 0)
+				panic("copyuvm: pte should exist");
+     		
+			// Retreive the corresponding page table entry for the shared memory block
+			if(!(*pte & PTE_P))
+				panic("copyuvm: page not present");
+  			uint pa = PTE_ADDR(*pte);
+
+   			uint flags = PTE_FLAGS(*pte);
+			uint start = i * PGSIZE;
+			// Calculate the valid starting memory
+			if (size > PGSIZE)
+				start = 12 * i * curproc->pid * PGSIZE;
+
+ 			int* ptr = (int*)(SHAREDMEM + start);
+      		if(smappages(pgdir,(void*)ptr, size, pa, flags) < 0)
+				panic("smtn");
+		}
+	}
 
 	// Commit to the user image.
 	oldpgdir = curproc->pgdir;
