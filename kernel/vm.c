@@ -383,3 +383,13 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 	}
 	return 0;
 }
+
+int smappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
+{
+	return mappages(pgdir,va,size,pa,perm);
+}
+pte_t * swalkpgdir(pde_t *pgdir, const void *va, int alloc)
+{
+return walkpgdir(pgdir,va,alloc);
+}
+

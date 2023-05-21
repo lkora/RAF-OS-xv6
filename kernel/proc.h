@@ -33,6 +33,14 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+#define MAX_SHARED_STRUCTS 10
+#define MAX_SHARED_STRUCT_NAME 10
+struct shared {
+    char name[MAX_SHARED_STRUCT_NAME];
+    void *addr;
+    int size;
+};
+
 // Per-process state
 struct proc {
 	uint sz;                     // Size of process memory (bytes)
@@ -48,6 +56,8 @@ struct proc {
 	struct file *ofile[NOFILE];  // Open files
 	struct inode *cwd;           // Current directory
 	char name[16];               // Process name (debugging)
+	pde_t *parent_pgdir;
+	struct shared shared_structs[MAX_SHARED_STRUCTS];
 };
 
 // Process memory is laid out contiguously, low addresses first:

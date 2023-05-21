@@ -183,7 +183,7 @@ fork(void)
 	int i, pid;
 	struct proc *np;
 	struct proc *curproc = myproc();
-
+	
 	// Allocate process.
 	if((np = allocproc()) == 0){
 		return -1;
@@ -207,6 +207,13 @@ fork(void)
 		if(curproc->ofile[i])
 			np->ofile[i] = filedup(curproc->ofile[i]);
 	np->cwd = idup(curproc->cwd);
+
+	// Copy the shared structures
+    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+        np->shared_structs[i] = curproc->shared_structs[i];
+    }
+    // Store a pointer to the parent's pages directory
+    np->parent_pgdir = curproc->pgdir;
 
 	safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -260,6 +267,13 @@ exit(void)
 				wakeup1(initproc);
 		}
 	}
+
+	// Free the shared objects
+    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+        if (curproc->shared_structs[i].size > 0) {
+            kfree((char *)P2V(PTE_ADDR(*swalkpgdir(curproc->pgdir, curproc->shared_structs[i].addr, 0))));
+        }
+    }
 
 	// Jump into the scheduler, never to return.
 	curproc->state = ZOMBIE;

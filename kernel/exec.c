@@ -92,6 +92,17 @@ exec(char *path, char **argv)
 		if(*s == '/')
 			last = s+1;
 	safestrcpy(curproc->name, last, sizeof(curproc->name));
+	
+	// Map the shared objects
+    pde_t *parent_pgdir = curproc->pgdir;
+    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+        if (curproc->shared_structs[i].size > 0) {
+            char *mem = kalloc();
+            memmove(mem, curproc->shared_structs[i].addr, PGSIZE);
+            smappages(parent_pgdir, (char *)(1 << 30) + i * PGSIZE, PGSIZE, V2P(mem), PTE_W | PTE_U);
+            curproc->shared_structs[i].addr = (void *)((1 << 30) + i * PGSIZE);
+        }
+    }
 
 	// Commit to the user image.
 	oldpgdir = curproc->pgdir;

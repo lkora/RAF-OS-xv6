@@ -89,3 +89,72 @@ sys_uptime(void)
 	release(&tickslock);
 	return xticks;
 }
+
+int sys_share_data(void) {
+    char *name;
+    void *addr;
+    int size;
+
+    // Retrieve the parameters from the user stack
+    if (argstr(0, &name) < 0 || argptr(1, (char **)&addr, sizeof(void *)) < 0 || argint(2, &size) < 0)
+        return -1;
+
+    // Check if the name is longer than 10 characters
+    if (strlen(name) > MAX_SHARED_STRUCT_NAME)
+        return -1;
+
+    // Check if there is already a shared structure with the same name
+    struct proc *curproc = myproc();
+    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+        if (curproc->shared_structs[i].size > 0 && strncmp(curproc->shared_structs[i].name, name, MAX_SHARED_STRUCT_NAME) == 0)
+            return -2;
+    }
+
+    // Find an unused shared structure
+    int index = -1;
+    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+        if (curproc->shared_structs[i].size == 0) {
+            index = i;
+            break;
+        }
+    }
+
+    // Check if there are already 10 shared structures in the current process
+    if (index == -1)
+        return -3;
+
+    // Register the new shared structure
+    strncpy(curproc->shared_structs[index].name, name, MAX_SHARED_STRUCT_NAME);
+    curproc->shared_structs[index].addr = addr;
+    curproc->shared_structs[index].size = size;
+
+    return index;
+}
+
+int sys_get_data(void) {
+    char *name;
+    void **addr;
+
+    // Retrieve the parameters from the user stack
+    if (argstr(0, &name) < 0 || argptr(1, (char **)&addr, sizeof(void *)) < 0)
+        return -1;
+
+    // Check if there is a shared structure with the specified name
+    struct proc *curproc = myproc();
+    int index = -1;
+    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+        if (curproc->shared_structs[i].size > 0 && strncmp(curproc->shared_structs[i].name, name, MAX_SHARED_STRUCT_NAME) == 0) {
+            index = i;
+            break;
+        }
+    }
+
+    // Check if there is no shared structure with the specified name
+    if (index == -1)
+        return -2;
+
+    // Update the addr pointer
+    *addr = curproc->shared_structs[index].addr;
+
+    return 0;
+}
