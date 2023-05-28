@@ -11,9 +11,15 @@ scanned_file scanned_files[100];
 int scanned_files_count = 0;
 pthread_mutex_t scanned_files_lock;
 
+int file_modified_flag = 0;
+pthread_mutex_t file_modified_flag_lock;
+
+
 void scanner_init()
 {
     pthread_mutex_init(&scanned_files_lock, NULL);
+    pthread_mutex_init(&file_modified_flag_lock, NULL);
+
 }
 
 time_t get_last_mod_time(char *file_name)
@@ -73,12 +79,35 @@ void *scanner_work(void *_args)
         {
             pthread_mutex_unlock(&scanned_files_lock);
 
+#ifdef DEBUG
             printf("File %s has already been scanned and has not been modified. Sleeping for 5 seconds.\n", file_name);
+#endif            
             sleep(5);
+
+            // Check if any file has been modified
+            pthread_mutex_lock(&file_modified_flag_lock);
+            if (file_modified_flag)
+            {
+                // Reset the flag and re-read the file
+                file_modified_flag = 0;
+                pthread_mutex_unlock(&file_modified_flag_lock);
+                continue;
+            }
+            pthread_mutex_unlock(&file_modified_flag_lock);
+
             continue;
         }
 
+        // Set the file_modified_flag to 1
+        pthread_mutex_lock(&file_modified_flag_lock);
+        file_modified_flag = 1;
+        pthread_mutex_unlock(&file_modified_flag_lock);
+
+        map_clear();
+
+#ifdef DEBUG
         printf("Scanning file %s\n", file_name);
+#endif
         add_scanned_file(file_name, mod_time);
 
         pthread_mutex_unlock(&scanned_files_lock);
@@ -92,7 +121,7 @@ void *scanner_work(void *_args)
 #ifdef DEBUG
             printf("Adding word %s to hash map\n", word);
 #endif
-            map_add_word_count(word, 1);
+            map_add_word_count(word, 1, file_name);
         }
 
         fclose(fp);
@@ -106,3 +135,4 @@ void *scanner_work(void *_args)
 
     return NULL;
 }
+

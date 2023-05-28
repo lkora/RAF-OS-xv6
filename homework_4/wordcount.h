@@ -12,6 +12,7 @@
 typedef struct hm_object {
     char* key;
     int value;
+    char* file_name;
 } hm_object;
 
 typedef struct search_result {
@@ -33,8 +34,9 @@ typedef struct {
 extern void scanner_init();
 extern void *scanner_work(void *_args);
 extern void map_init();
-extern void map_add_word_count(char *word, int value);
-extern search_result *map_get_frequency(char *word);
+extern void map_add_word_count(char *word, int value, char *file_name);
+extern search_result *map_get_frequency(char *word, char *file_name);
+extern int map_get_total_frequency(char *word);
 extern void add_stopword(char* word);
 extern void map_clear();
 

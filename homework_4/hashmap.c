@@ -60,7 +60,7 @@ unsigned long hash(char *str)
     return hash % MAX_HASH_SIZE;
 }
 
-void map_add_word_count(char *word, int value)
+void map_add_word_count(char *word, int value, char *file_name)
 {
     if (is_stop_word(word))
     {
@@ -81,11 +81,14 @@ void map_add_word_count(char *word, int value)
         printf("Adding new entry for word %s at index %lu\n", word, index);
 #endif
         hash_map[index].key = malloc(MAX_WORD_LEN);
+        hash_map[index].file_name = malloc(MAX_WORD_LEN);
+        
         strcpy(hash_map[index].key, word);
+        strcpy(hash_map[index].file_name, file_name);
         hash_map[index].value = value;
         hash_map_size++;
     }
-    else if (strcmp(hash_map[index].key, word) == 0)
+    else if (strcmp(hash_map[index].key, word) == 0 && strcmp(hash_map[index].file_name, file_name) == 0)
     {
 #ifdef DEBUG
         printf("Incrementing count for word %s at index %lu\n", word, index);
@@ -108,14 +111,16 @@ void map_add_word_count(char *word, int value)
                 printf("Adding new entry for word %s at index %lu\n", word, i);
 #endif
                 hash_map[i].key = malloc(MAX_WORD_LEN);
+                hash_map[i].file_name = malloc(MAX_WORD_LEN);
                 strcpy(hash_map[i].key, word);
+                strcpy(hash_map[i].file_name, file_name);
                 hash_map[i].value = value;
                 hash_map_size++;
                 found = 1;
                 pthread_mutex_unlock(&hash_map_locks[i]);
                 break;
             }
-            else if (strcmp(hash_map[i].key, word) == 0)
+            else if (strcmp(hash_map[i].key, word) == 0 && strcmp(hash_map[i].file_name, file_name) == 0)
             {
 #ifdef DEBUG
                 printf("Incrementing count for word %s at index %lu\n", word, i);
@@ -135,7 +140,7 @@ void map_add_word_count(char *word, int value)
     pthread_mutex_unlock(&hash_map_locks[index]);
 }
 
-search_result *map_get_frequency(char *word)
+search_result *map_get_frequency(char *word, char *file_name)
 {
     search_result *result = malloc(sizeof(search_result));
     result->key = malloc(MAX_WORD_LEN);
@@ -147,7 +152,7 @@ search_result *map_get_frequency(char *word)
     printf("Calculated hash value for word %s: %lu\n", word, index);
 #endif
     pthread_mutex_lock(&hash_map_locks[index]);
-    if (hash_map[index].key != NULL && strcmp(hash_map[index].key, word) == 0)
+    if (hash_map[index].key != NULL && strcmp(hash_map[index].key, word) == 0 && strcmp(hash_map[index].file_name, file_name) == 0)
     {
         result->value = hash_map[index].value;
         pthread_mutex_unlock(&hash_map_locks[index]);
@@ -162,7 +167,7 @@ search_result *map_get_frequency(char *word)
     for (unsigned long i = index + 1; i != index; i = (i + 1) % MAX_HASH_SIZE)
     {
         pthread_mutex_lock(&hash_map_locks[i]);
-        if (hash_map[i].key != NULL && strcmp(hash_map[i].key, word) == 0)
+        if (hash_map[i].key != NULL && strcmp(hash_map[i].key, word) == 0 && strcmp(hash_map[i].file_name, file_name) == 0)
         {
             result->value = hash_map[i].value;
             pthread_mutex_unlock(&hash_map_locks[i]);
@@ -172,4 +177,19 @@ search_result *map_get_frequency(char *word)
     }
 
     return result;
+}
+
+int map_get_total_frequency(char *word)
+{
+    int total = 0;
+    for (int i = 0; i < MAX_HASH_SIZE; i++)
+    {
+        pthread_mutex_lock(&hash_map_locks[i]);
+        if (hash_map[i].key != NULL && strcmp(hash_map[i].key, word) == 0)
+        {
+            total += hash_map[i].value;
+        }
+        pthread_mutex_unlock(&hash_map_locks[i]);
+    }
+    return total;
 }

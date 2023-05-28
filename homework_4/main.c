@@ -17,7 +17,12 @@ void start_scanner_thread(char *file_name)
     }
 
     strcpy(threads[thread_count].file_name, file_name);
-    pthread_create(&threads[thread_count++].thread_id, NULL, &scanner_work, (void *)file_name);
+
+    // Create a copy of the file_name parameter to pass to the new thread
+    char *file_name_copy = malloc(strlen(file_name) + 1);
+    strcpy(file_name_copy, file_name);
+
+    pthread_create(&threads[thread_count++].thread_id, NULL, &scanner_work, (void *)file_name_copy);
 }
 
 int main(int argc, char **argv)
@@ -66,12 +71,8 @@ int main(int argc, char **argv)
         }
         else
         {
-            search_result *result = map_get_frequency(command);
-
-            printf("%d\n", result->value);
-
-            free(result->key);
-            free(result);
+            int total = map_get_total_frequency(command);
+            printf("%d\n", total);
         }
     }
 
