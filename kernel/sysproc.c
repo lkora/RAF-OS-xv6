@@ -127,59 +127,38 @@ int sys_share_data(void) {
     strncpy(curproc->shared_structs[index].name, name, MAX_SHARED_STRUCT_NAME);
     curproc->shared_structs[index].addr = addr;
     curproc->shared_structs[index].size = size;
-    cprintf("Saved at address: %p - name %s\n", addr, name);
+    cprintf("Saved at address: %p - name %s - size %d\n", addr, name, size);
 
     return index;
 }
 
 int sys_get_data(void) {
-    // char *name;
-    // void **addr;
+    char *name;
+    void **addr;
 
-    // // Retrieve the parameters from the user stack
-    // if (argstr(0, &name) < 0 || argptr(1, (char **)&addr, sizeof(void *)) < 0)
-    //     return -1;
+    // Retrieve the parameters from the user stack
+    if (argstr(0, &name) < 0 || argptr(1, (char **)&addr, sizeof(void *)) < 0)
+        return -1;
 
-    // // Check if there is a shared structure with the specified name
-    // struct proc *curproc = myproc();
-    // int index = -1;
-    // for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
-    //     if (curproc->shared_structs[i].size > 0 && strncmp(curproc->shared_structs[i].name, name, MAX_SHARED_STRUCT_NAME) == 0) {
-    //         index = i;
-    //         cprintf("Found addres for name: %s at index: %d\n", name, index);
-    //         break;
-    //     }
-    // }
-
-    // // Check if there is no shared structure with the specified name
-    // if (index == -1)
-    //     return -2;
-
-    // // Update the addr pointer
-    // *addr = curproc->shared_structs[index].addr;
-    // cprintf("At address: %p\n", addr);
-
-    // return 0;
-
-    char *name; void **addr;
-	 if(argstr(0, &name) < 0 || argptr(1, (char**)&addr, sizeof(char*)))
-		return -1;
-	
-	struct shared *shrd = myproc()->shared_structs;
+    // Check if there is a shared structure with the specified name
+    struct proc *curproc = myproc();
     int index = -1;
+    for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
+        if (curproc->shared_structs[i].size > 0 && strncmp(curproc->shared_structs[i].name, name, MAX_SHARED_STRUCT_NAME) == 0) {
+            index = i;
+            cprintf("Found addres for name: %s at index: %d\n", name, index);
+            break;
+        }
+    }
 
-	for(int i = 0; i < MAX_SHARED_STRUCTS; i++){
-		if(strncmp(name, shrd[i].name, MAX_SHARED_STRUCT_NAME) == 0)
-		    index = i;	
-	}
-	if(index == -1)
+    // Check if there is no shared structure with the specified name
+    if (index == -1)
         return -2;
 
+    // Update the addr pointer
+    *addr = (void*)(curproc->shared_structs[index].addr);
+    cprintf("Shared index: %d - at address: %p\n", index, addr);
 
-	uint hlp = PGSIZE * index;
-	if(myproc()->shared_structs[index].size > PGSIZE)
-		hlp = PGSIZE * myproc()->pid * index * 12;
+    return 0;
 
-    *addr = (void *)(SHAREDMEM + ((int)shrd[index].addr % PGSIZE + hlp));
-	return 0;
 }

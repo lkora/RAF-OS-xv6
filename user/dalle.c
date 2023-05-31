@@ -26,9 +26,8 @@ int main(int argc, char *argv[]) {
         exit();
     }
 
-    fprintf(2, "DALLE - Addr shared: %p\n", data);
     fprintf(2, "%s %d %d %d %d\n", data.filepath, data.sentence_count, data.longest_word_size, data.shortest_word_size, data.text_shortest_word_size);
-    printf("Parent: filepath = %s, data.filepath = %p\n", data.filepath, data.filepath);
+    printf("Parent: filepath = %s, data.filepath = %p\n\n", data.filepath, data.filepath);
 
 
     // Start the coMMa child process

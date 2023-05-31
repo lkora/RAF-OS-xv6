@@ -35,6 +35,7 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 #define MAX_SHARED_STRUCTS 10
 #define MAX_SHARED_STRUCT_NAME 10
+
 struct shared {
     char name[MAX_SHARED_STRUCT_NAME];
     void *addr;

@@ -47,7 +47,7 @@ int main(void) {
         exit();
     }
 
-    fprintf(2, "LISA - Addr shared: %p\n", *data);
+    fprintf(2, "LISA - Addr shared: %p\n", data);
     fprintf(2, "%c %d %d %d %d\n", *data->filepath, data->sentence_count, data->longest_word_size, data->shortest_word_size, data->text_shortest_word_size);
     printf("Child: filepath = %s, data->filepath = %p\n", data->filepath, data->filepath);
 

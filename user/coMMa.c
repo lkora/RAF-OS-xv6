@@ -10,7 +10,8 @@ int main(void) {
         fprintf(2, "get_data failed\n");
         exit();
     }
-
+    fprintf(2, "coMMa shared: %p\n", data);
+    
     // Accept commands from the user in a loop
     while (1) {
         fprintf(1, "> ");

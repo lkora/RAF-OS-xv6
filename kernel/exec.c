@@ -94,15 +94,6 @@ exec(char *path, char **argv)
 	safestrcpy(curproc->name, last, sizeof(curproc->name));
 
 	// Map the shared objects
-    // pde_t *parent_pgdir = curproc->pgdir;
-    // for (int i = 0; i < MAX_SHARED_STRUCTS; i++) {
-    //     if (curproc->shared_structs[i].size > 0) {
-    //         char *mem = kalloc();
-    //         memmove(mem, curproc->shared_structs[i].addr, PGSIZE);
-    //         smappages(parent_pgdir, (char *)(1 << 30) + i * PGSIZE, PGSIZE, V2P(mem), PTE_W | PTE_U);
-    //         curproc->shared_structs[i].addr = (void *)((1 << 30) + i * PGSIZE);
-    //     }
-    // }
 	for(i = 0; i < MAX_SHARED_STRUCTS; i++){
 		int size;
 		if((size=curproc->shared_structs[i].size) != 0){
@@ -120,7 +111,7 @@ exec(char *path, char **argv)
 			uint start = i * PGSIZE;
 			// Calculate the valid starting memory
 			if (size > PGSIZE)
-				start = 12 * i * curproc->pid * PGSIZE;
+				start = i  * PGSIZE;
 
  			int* ptr = (int*)(SHAREDMEM + start);
       		if(smappages(pgdir,(void*)ptr, size, pa, flags) < 0)
