@@ -102,8 +102,9 @@ void map_add_word_count(char *word, int value, char *file_name)
         printf("Collision detected for word %s at index %lu\n", word, index);
 #endif
         int found = 0;
+        pthread_mutex_unlock(&hash_map_locks[index]);
         for (unsigned long i = index + 1; i != index; i = (i + 1) % MAX_HASH_SIZE)
-        {
+        {   
             pthread_mutex_lock(&hash_map_locks[i]);
             if (hash_map[i].key == NULL)
             {

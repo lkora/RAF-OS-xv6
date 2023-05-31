@@ -79,9 +79,7 @@ void *scanner_work(void *_args)
         {
             pthread_mutex_unlock(&scanned_files_lock);
 
-#ifdef DEBUG
             printf("File %s has already been scanned and has not been modified. Sleeping for 5 seconds.\n", file_name);
-#endif            
             sleep(5);
 
             // Check if any file has been modified
@@ -105,9 +103,7 @@ void *scanner_work(void *_args)
 
         map_clear();
 
-#ifdef DEBUG
         printf("Scanning file %s\n", file_name);
-#endif
         add_scanned_file(file_name, mod_time);
 
         pthread_mutex_unlock(&scanned_files_lock);
